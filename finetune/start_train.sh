@@ -1,0 +1,12 @@
+mlx_lm.lora \
+  --model mlx-community/gemma-2-2b-it-4bit \
+  --train \
+  --data data \
+  --iters 500 \
+  --batch-size 2 \
+  --learning-rate 1e-4 \
+  --adapter-path adapters/gemma2_2b_lora \
+  --save-every 100 \
+  --test \
+  --fine-tune-type lora \
+  --max-seq-length 4096
