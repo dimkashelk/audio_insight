@@ -61,6 +61,14 @@ with tab1:
                         st.subheader("Резюме и термины")
                         summary_display = data["summary"].replace("\\n", "\n")
                         st.markdown(f"```\n{summary_display}\n```")
+
+                        if st.button("Скачать отчёт (.txt)"):
+                            content = f"ФАЙЛ: {data['filename']}\n{'=' * 60}\n\nТРАНСКРИПТ:\n"
+                            for seg in data["transcript"]:
+                                content += f"[{seg['start']:.1f}-{seg['end']:.1f}] {seg['text']}\n"
+                            content += f"\n{'=' * 60}\nРЕЗЮМЕ:\n{summary_display}\n"
+                            st.download_button("Скачать", content, file_name=f"report_{data['filename']}.txt",
+                                               mime="text/plain")
                 else:
                     st.error(f"Ошибка: {result.get('error', 'Неизвестная')}")
             else:
