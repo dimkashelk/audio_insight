@@ -28,4 +28,13 @@ with tab1:
                 st.success("Файл отправлен в обработку")
 
 with tab2:
-    st.info("Вставьте текст для анализа")
+    text_input = st.text_area("Вставьте транскрипт или текст для анализа", height=300)
+    if st.button("Сгенерировать резюме") and text_input.strip():
+        with st.spinner("Генерация..."):
+            res = requests.post(f"{API_URL}/summarize-text", json={"text": text_input})
+            if res.status_code == 200:
+                task_id = res.json()["task_id"]
+                st.session_state["text_task_id"] = task_id
+                st.success("Запрос отправлен в обработку")
+            else:
+                st.error(f"Ошибка API: {res.text}")
