@@ -1,8 +1,15 @@
-# backend/tasks.py
 import os
+import sys
 import logging
+import multiprocessing
 from celery import Celery
 import whisper
+import torch
+
+
+if sys.platform == "darwin":
+    multiprocessing.set_start_method('spawn', force=True)
+
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
