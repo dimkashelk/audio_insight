@@ -1,0 +1,62 @@
+services:
+  redis:
+    image: redis:7-alpine
+    ports: ["6379:6379"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+#  ollama:
+#    image: ollama/ollama:latest
+#    ports: ["11434:11434"]
+#    volumes: ["ollama-data:/root/.ollama"]
+#    deploy:
+#      resources:
+#        limits:
+#          memory: 24G
+
+  ml-service:
+    build: ./ml-service
+    ports: ["8001:8001"]
+    environment:
+      - OLLAMA_URL=http://host.docker.internal:11434
+      - MODEL_NAME=gemma-summarizer
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  backend:
+    build: ./backend
+    ports: [ "8000:8000" ]
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - ML_SERVICE_URL=http://ml-service:8001
+      - WHISPER_CACHE_DIR=/whisper-cache
+    volumes:
+      - ./backend/uploads:/app/uploads
+      - ./models/whisper-cache:/whisper-cache:ro
+    depends_on: [ redis, ml-service ]
+    command: >
+      sh -c "uvicorn main:app --host 0.0.0.0 --port 8000 &
+             celery -A tasks.celery_app worker --loglevel=info --pool=solo"
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8000/health" ]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  streamlit:
+    build: ./frontend
+    ports: ["8501:8501"]
+    environment:
+      - API_URL=http://backend:8000
+    depends_on: [backend]
+
+volumes:
+  ollama-data:
