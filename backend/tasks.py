@@ -13,3 +13,14 @@ celery_app = Celery("tasks", broker=CELERY_BROKER_URL)
 celery_app.conf.result_backend = CELERY_BROKER_URL
 celery_app.conf.task_track_started = True
 celery_app.conf.result_expires = 3600
+
+@celery_app.task(bind=True)
+def process_audio_task(self, filepath: str, filename: str):
+    # TODO
+    pass
+
+
+@celery_app.task(bind=True)
+def summarize_text_task(self, text: str):
+    # TODO
+    pass
