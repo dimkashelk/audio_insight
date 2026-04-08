@@ -46,7 +46,31 @@ with tab1:
                 time.sleep(2)
 
             if status["status"] == "SUCCESS":
-                st.success("Обработка завершена!")
+                result = requests.get(f"{API_URL}/result/{task_id}").json()
+                if "result" in result and result["result"]:
+                    data = result["result"]
+                    st.success("Готово!")
+
+                    col1, col2 = st.columns([1, 1])
+                    with col1:
+                        st.subheader("Транскрипт")
+                        with st.expander("Показать полный текст", expanded=False):
+                            for seg in data["transcript"]:
+                                st.markdown(f"`[{seg['start']:.1f}s - {seg['end']:.1f}s]` {seg['text']}")
+                    with col2:
+                        st.subheader("Резюме и термины")
+                        summary_display = data["summary"].replace("\\n", "\n")
+                        st.markdown(f"```\n{summary_display}\n```")
+
+                        if st.button("Скачать отчёт (.txt)"):
+                            content = f"ФАЙЛ: {data['filename']}\n{'=' * 60}\n\nТРАНСКРИПТ:\n"
+                            for seg in data["transcript"]:
+                                content += f"[{seg['start']:.1f}-{seg['end']:.1f}] {seg['text']}\n"
+                            content += f"\n{'=' * 60}\nРЕЗЮМЕ:\n{summary_display}\n"
+                            st.download_button("Скачать", content, file_name=f"report_{data['filename']}.txt",
+                                               mime="text/plain")
+                else:
+                    st.error(f"Ошибка: {result.get('error', 'Неизвестная')}")
             else:
                 st.error(f"{status.get('status', 'Ошибка')}")
 
@@ -79,9 +103,12 @@ with tab2:
                     time.sleep(2)
 
                 if status["status"] == "SUCCESS":
-                    st.success("Генерация завершена!")
-                else:
-                    st.error(f"{status.get('status', 'Ошибка')}")
+                    result = requests.get(f"{API_URL}/result/{task_id}").json()
+                    if "result" in result and result["result"]:
+                        summary = result["result"]["summary"].replace("\\n", "\n")
+                        st.markdown(f"```\n{summary}\n```")
+                    else:
+                        st.error(result.get("error", "Ошибка"))
 
             else:
                 st.error(f"Ошибка API: {res.text}")
