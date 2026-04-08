@@ -14,5 +14,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 RUN mkdir -p /root/.cache/whisper uploads
 
+ENV PYTHONUNBUFFERED=1
+ENV PYTORCH_ENABLE_MPS_FALLBACK=1
+
 CMD sh -c "uvicorn main:app --host 0.0.0.0 --port 8000 & \
            celery -A tasks.celery_app worker --loglevel=info --pool=solo"
