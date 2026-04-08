@@ -61,8 +61,27 @@ from tasks import celery_app
 
 @app.get("/status/{task_id}")
 def get_status(task_id: str):
-    # TODO celery_app
-    pass
+    try:
+        res = celery_app.AsyncResult(task_id)
+
+        info = {}
+        try:
+            if res.info and isinstance(res.info, dict):
+                info = res.info
+        except Exception:
+            pass
+
+        status = info.get("status", res.state) if res.state else "PENDING"
+        progress = info.get("progress", 0 if status == "PENDING" else 100 if status in ("SUCCESS", "FAILURE") else 50)
+
+        return {
+            "task_id": task_id,
+            "status": status,
+            "progress": progress
+        }
+    except Exception as e:
+        logger.warning(f"Status fallback for {task_id}: {e}")
+        return {"task_id": task_id, "status": "UNKNOWN", "progress": 0}
 
 
 @app.get("/result/{task_id}", response_model=ResultResponse)
