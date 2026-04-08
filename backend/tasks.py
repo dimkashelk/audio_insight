@@ -5,6 +5,7 @@ import multiprocessing
 from celery import Celery
 import whisper
 import torch
+import httpx
 
 
 if sys.platform == "darwin":
@@ -77,8 +78,49 @@ def transcribe_audio(filepath: str) -> list[dict]:
 
 @celery_app.task(bind=True)
 def process_audio_task(self, filepath: str, filename: str):
-    # TODO
-    pass
+    try:
+        self.update_state(state="PROGRESS", meta={"progress": 10, "status": "Инициализация..."})
+
+        self.update_state(state="PROGRESS", meta={"progress": 30, "status": "Распознавание речи (Whisper)..."})
+        transcript = transcribe_audio(filepath)
+        full_text = " ".join(seg["text"] for seg in transcript)
+        logger.info(f"Транскрибация: {len(transcript)} сегментов, {len(full_text)} символов")
+
+        self.update_state(state="PROGRESS", meta={"progress": 70, "status": "Генерация анализа (Gemma-3-12B)..."})
+
+        with httpx.Client(timeout=300.0) as client:
+            resp = client.post(
+                f"{ML_SERVICE_URL}/summarize",
+                json={"transcript": full_text, "max_tokens": 600}
+            )
+            resp.raise_for_status()
+            ml_result = resp.json()
+
+        self.update_state(state="PROGRESS", meta={"progress": 100, "status": "Готово!"})
+        logger.info("Задача завершена успешно")
+
+        if os.path.exists(filepath):
+            os.remove(filepath)
+
+        return {
+            "filename": filename,
+            "transcript": transcript,
+            "summary": ml_result["summary"],
+            "model_used": ml_result["model"],
+            "tokens_used": ml_result.get("tokens_used", 0)
+        }
+
+    except httpx.HTTPStatusError as e:
+        error_msg = f"HTTP {e.response.status_code}: {e.response.text[:200]}"
+        logger.error(f"❌ HTTP ошибка: {error_msg}")
+        self.update_state(state="FAILURE", meta={"status": f"Ошибка API: {error_msg}"})
+        return {"error": error_msg}
+
+    except Exception as e:
+        error_msg = f"{type(e).__name__}: {str(e)[:300]}"
+        logger.error(f"❌ Ошибка в task: {error_msg}", exc_info=True)
+        self.update_state(state="FAILURE", meta={"status": error_msg})
+        return {"error": error_msg}
 
 
 @celery_app.task(bind=True)
