@@ -125,5 +125,28 @@ def process_audio_task(self, filepath: str, filename: str):
 
 @celery_app.task(bind=True)
 def summarize_text_task(self, text: str):
-    # TODO
-    pass
+    try:
+        self.update_state(state="PROGRESS", meta={"progress": 50, "status": "Генерация..."})
+
+        with httpx.Client(timeout=180.0) as client:
+            resp = client.post(
+                f"{ML_SERVICE_URL}/summarize",
+                json={"transcript": text, "max_tokens": 600}
+            )
+            resp.raise_for_status()
+            result = resp.json()
+
+        self.update_state(state="PROGRESS", meta={"progress": 100, "status": "Готово!"})
+        return {"summary": result["summary"], "model_used": result["model"]}
+
+    except httpx.HTTPStatusError as e:
+        error_msg = f"HTTP {e.response.status_code}: {e.response.text[:200]}"
+        logger.error(f"HTTP ошибка: {error_msg}")
+        self.update_state(state="FAILURE", meta={"status": f"Ошибка API: {error_msg}"})
+        return {"error": error_msg}
+
+    except Exception as e:
+        error_msg = f"{type(e).__name__}: {str(e)[:300]}"
+        logger.error(f"Ошибка: {error_msg}")
+        self.update_state(state="FAILURE", meta={"status": error_msg})
+        return {"error": error_msg}
