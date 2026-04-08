@@ -40,6 +40,34 @@ def init_whisper_worker():
     logger.info("Модель загружена")
 
 
+def transcribe_audio(filepath: str) -> list[dict]:
+    """Транскрибация с возвратом сегментов (совместимо с форматом UI)"""
+    global _worker_model
+
+    if _worker_model is None:
+        init_whisper_worker()
+
+    result = _worker_model.transcribe(
+        filepath,
+        language="ru",
+        verbose=False,
+        fp16=(_worker_device != "cpu")
+    )
+
+    segments = []
+    for seg in result.get("segments", []):
+        segments.append({
+            "start": round(seg.get("start", 0), 2),
+            "end": round(seg.get("end", 0), 2),
+            "text": seg.get("text", "").strip()
+        })
+
+    if _worker_device == "mps":
+        torch.mps.empty_cache()
+
+    return segments
+
+
 @celery_app.task(bind=True)
 def process_audio_task(self, filepath: str, filename: str):
     # TODO
