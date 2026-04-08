@@ -2,6 +2,7 @@ from fastapi import FastAPI, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import os
+from tasks import process_audio_task, summarize_text_task
 
 
 app = FastAPI(title="AudioInsight Backend", version="1.0.0")
@@ -43,6 +44,9 @@ async def upload_audio(file: UploadFile = File(...)):
 async def summarize_text(req: SummarizeTextRequest):
     # TODO summarize_text_task
     pass
+
+
+from tasks import celery_app
 
 
 @app.get("/status/{task_id}")
