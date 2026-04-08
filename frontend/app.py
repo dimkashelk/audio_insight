@@ -1,5 +1,5 @@
 import streamlit as st
-import requests, os
+import requests, time, os
 
 API_URL = os.getenv("API_URL", "http://127.0.0.1:8000")
 
@@ -24,8 +24,31 @@ with tab1:
                     st.error(f"Ошибка: {res.text}")
                     st.stop()
                 task_id = res.json()["task_id"]
-                st.session_state["audio_task_id"] = task_id
-                st.success("Файл отправлен в обработку")
+
+            progress_bar = st.progress(0)
+            status_text = st.empty()
+
+            while True:
+                try:
+                    resp = requests.get(f"{API_URL}/status/{task_id}", timeout=10.0)
+                    resp.raise_for_status()
+                    status = resp.json()
+                except requests.exceptions.RequestException as e:
+                    st.warning(f"Потеря связи с сервером. Пробуем снова... ({e})")
+                    time.sleep(2)
+                    continue
+
+                prog = status.get("progress", 0)
+                progress_bar.progress(min(prog / 100, 1.0), text=status.get("status", "Обработка..."))
+
+                if status.get("status") in ("SUCCESS", "FAILURE"):
+                    break
+                time.sleep(2)
+
+            if status["status"] == "SUCCESS":
+                st.success("Обработка завершена!")
+            else:
+                st.error(f"{status.get('status', 'Ошибка')}")
 
 with tab2:
     text_input = st.text_area("Вставьте транскрипт или текст для анализа", height=300)
@@ -34,7 +57,31 @@ with tab2:
             res = requests.post(f"{API_URL}/summarize-text", json={"text": text_input})
             if res.status_code == 200:
                 task_id = res.json()["task_id"]
-                st.session_state["text_task_id"] = task_id
-                st.success("Запрос отправлен в обработку")
+
+                progress_bar = st.progress(0)
+                status_text = st.empty()
+
+                while True:
+                    try:
+                        resp = requests.get(f"{API_URL}/status/{task_id}", timeout=10.0)
+                        resp.raise_for_status()
+                        status = resp.json()
+                    except requests.exceptions.RequestException as e:
+                        st.warning(f"Потеря связи с сервером. Пробуем снова... ({e})")
+                        time.sleep(2)
+                        continue
+
+                    prog = status.get("progress", 0)
+                    progress_bar.progress(min(prog / 100, 1.0), text=status.get("status", "Обработка..."))
+
+                    if status.get("status") in ("SUCCESS", "FAILURE"):
+                        break
+                    time.sleep(2)
+
+                if status["status"] == "SUCCESS":
+                    st.success("Генерация завершена!")
+                else:
+                    st.error(f"{status.get('status', 'Ошибка')}")
+
             else:
                 st.error(f"Ошибка API: {res.text}")
