@@ -51,8 +51,9 @@ async def upload_audio(file: UploadFile = File(...)):
 
 @app.post("/summarize-text", response_model=TaskResponse)
 async def summarize_text(req: SummarizeTextRequest):
-    # TODO summarize_text_task
-    pass
+    """Прямая генерация резюме по тексту (без транскрибации)"""
+    task = summarize_text_task.delay(req.text)
+    return TaskResponse(task_id=task.id, status="queued", progress=0)
 
 
 from tasks import celery_app
